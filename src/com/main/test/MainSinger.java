@@ -5,9 +5,13 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Observer;
 import java.util.concurrent.TimeUnit;
+import javax.swing.JFrame;
 
+import com.graphique.Fenetre;
+import com.graphique.Panneau;
 import com.module.interaction.RXTXListener;
 import com.module.interaction.ReaderHelper;
+//import com.mongodb.*;
 import com.rfid.RFIDReaderHelper;
 import com.rfid.ReaderConnector;
 import com.rfid.rxobserver.RXObserver;
@@ -24,6 +28,7 @@ public class MainSinger {
 	static ArrayList<Equipement> equipements_BDD = new ArrayList<>();
 	static ArrayList<SetEquipement> setEquipements_BDD = new ArrayList<>();
 	static ReaderHelper mReaderHelper;
+	static boolean quelle_antenne = true;
 	
 	static Observer mObserver = new RXObserver() {
 		@Override
@@ -36,12 +41,12 @@ public class MainSinger {
 		@Override
 		protected void onInventoryTagEnd(RXInventoryTag.RXInventoryTagEnd endTag) {
 			System.out.println("inventory end:" + endTag.mTotalRead);
-			((RFIDReaderHelper) mReaderHelper).realTimeInventory((byte) 0xff,(byte)0x01);
+			((RFIDReaderHelper) mReaderHelper).realTimeInventory((byte) 0xff,(byte)0xff);
 		}
 		
 		@Override
 		protected void onExeCMDStatus(byte cmd,byte status) {
-			System.out.format("CDM:%s  Execute status:%S", 
+			System.out.format("CDM:%s  Execute status:%S",
 					String.format("%02X",cmd),String.format("%02x", status));
 		}
 		
@@ -58,12 +63,12 @@ public class MainSinger {
 		@Override
 		protected void onInventoryTagEnd(RXInventoryTag.RXInventoryTagEnd endTag) {
 			System.out.println("inventory end:" + endTag.mTotalRead);
-			((RFIDReaderHelper) mReaderHelper).realTimeInventory((byte) 0xff,(byte)0x01);
+			((RFIDReaderHelper) mReaderHelper).realTimeInventory((byte) 0xff,(byte)0xff);
 		}
 		
 		@Override
 		protected void onExeCMDStatus(byte cmd,byte status) {
-			System.out.format("CDM:%s  Execute status:%S", 
+			System.out.format("CDM:%s  Execute status:%S",
 					String.format("%02X",cmd),String.format("%02x", status));
 		}
 	};
@@ -88,7 +93,7 @@ public class MainSinger {
 		
 	};
 	/***
-	 * Fonction qui met en route l'antenne donn�e en parametre
+	 * Fonction qui met en route l'antenne donnée en parametre
 	 * @param idAntenne (antenne 1: 0x00, antenne 2: 0x01,antenne 3: 0x02,antenne 4: 0x03) 
 	 */
 	public static void setWorkAntenna(byte idAntenne) {
@@ -96,16 +101,19 @@ public class MainSinger {
 	}
 	/***
 	 * fonction qui commence par mettre en route les antennes puis fait une lecture des tags pour le temps indiqué par @secondes
-	 * @param secondes temps de lecture
+	 * @param millisecondes temps de lecture
 	 * @param antennes liste des antennes à mettre en route (antenne 1: 0x00, antenne 2: 0x01,antenne 3: 0x02,antenne 4: 0x03)
 	 */
-	public static void realTimeInventory(int secondes, byte[] antennes) {
+	public static void realTimeInventory(int millisecondes, byte[] antennes) {
+
+		// La fonction de lecture est à revoir. En effet une fois que l'ordre est lancé, la lecture ne s'arrete que quand le reader dit avoir termin�, pas au bout des X secondes.
+		//Il n'est peut etre pas nécessaire de setWork les antennes à chaque fois.
 		for (byte antenne : antennes) {
 			setWorkAntenna(antenne);
 		}
 		((RFIDReaderHelper) mReaderHelper).realTimeInventory((byte) 0x01, (byte) 0xff);
 		try {
-			TimeUnit.SECONDS.sleep(secondes);
+			TimeUnit.MILLISECONDS.sleep(millisecondes);
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -117,12 +125,14 @@ public class MainSinger {
 	 * On cherche d'abord a connaitre son type, c'est à dire est ce que c'est un humain ou un equipement, si ce n'est aucun des 2 c'est une erreur.
 	 * Le processus marche ensuite de la meme manière, on regarde si l'humain ou l'équipement est déjà présent dans la mémoire tampon, si ce n'est pas
 	 * le cas on le rajoute.
-	 * @param epc donnée en brut qui arrive à l'ordinateur
+	 * @param epc donné en brut qui arrive à l'ordinateur
 	 */
 	public static void process_tag(String epc) {
 		int len_epc = epc.length();
-		String type = epc.substring(len_epc-4, len_epc-2);
+		System.out.println(epc);
+		String type = epc.substring(len_epc-5, len_epc-3);
 		String id = epc.substring(len_epc-2,len_epc);
+		System.out.println("le type:"+type+" et le id: "+ id);
 		if (type.equals("00")){
 			Humain nouvelhumain = new Humain(id);
 			boolean humain_deja_present = false;
@@ -178,7 +188,7 @@ public class MainSinger {
 	 * @param id identifiant de l'humain
 	 * @return un humain en particulier
 	 */
-	public static Humain getHumainById(String id){
+	private static Humain getHumainById(String id){
 		int nb_humains = humains_BDD.size();
 		for (int i =0; i < nb_humains; i++){
 			if (humains_BDD.get(i).getId_humain().equals(id)){
@@ -244,6 +254,12 @@ public class MainSinger {
 	public static void main(String[] args) {
 
 		//initialisation base de données:
+		/*MongoClient mongoClient=new MongoClient(new MongoClientURI("mongodb://singertest:singer2018@ds121413.mlab.com:21413/singer_db"));
+		DB database = mongoClient.getDB("singer_db");
+		DBCollection collection=database.getCollection("equipment");
+		DBObject employees=collection.findOne();
+		System.out.println(employees);*/
+
 		// cette partie du code est à remplacer par la connexion avec la base de donnée
 		equipements_BDD.add(new Equipement("gants","01"));
 		equipements_BDD.add(new Equipement("veste","02"));
@@ -253,6 +269,7 @@ public class MainSinger {
 		ArrayList<Equipement> setn1= new ArrayList<>();
 		setn1.add(equipements_BDD.get(0));
 		setn1.add(equipements_BDD.get(1));
+		setn1.add(equipements_BDD.get(2));
 		setEquipements_BDD.add(new SetEquipement(setn1,"plombier"));
 
 		ArrayList<Equipement> setn2= new ArrayList<>();
@@ -267,12 +284,20 @@ public class MainSinger {
 
 
 
+		//déploiement de la fenetre graphique
+		Fenetre fen = new Fenetre();
+		Panneau.equipement_is_missing = false;
+		fen.getContentPane().repaint();
+
+
 		// étape de la conexion de l'antenne
 		final ReaderConnector mConnector = new ReaderConnector();
 		mReaderHelper = mConnector.connectCom("COM3", 115200);
 		if(mReaderHelper != null) {
 			System.out.println("Connect success!");
+			fen.getContentPane().repaint();
 			try {
+				// on ne sait pas très bien pourquoi, mais le programme marche bcp mieux avec 2 observers. Il ne se passe rien quand on en utilise un seul.
 				mReaderHelper.registerObserver(mObserver);
 				mReaderHelper.registerObserver(mObserver1);
 				mReaderHelper.setRXTXListener(mListener);
@@ -282,6 +307,9 @@ public class MainSinger {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 				}
+			// il y a une latence entre le moment où on met en route le reader et les premières informations recues.
+			//Donc plutot que directement se lancer dans la boucle et avoir aucun retour, on tente de lui laisser quelques secondes de r�pit
+			dormir(2);
 		} else {
 			System.out.println("Connect faild!");
 			mConnector.disConnect();
@@ -292,75 +320,109 @@ public class MainSinger {
 		int nb_tours = 0;
 		int nb_relecture_manquant= 0;
 		int nb_lectures = 0;
-		int nb_min_tags = 3;
-		int temps_lecture = 4;
+		int nb_min_tags = 2;
+		int temps_lecture = 1500;
 		int nb_tags_detectes = 0;
 		byte[] les_antennes = new byte[] {0x00,0x01};
 		
 		
 		boolean flag = true;
-		while (flag == true) { // à voir si on veut sortir de la boucle à un moment donné, peut etre via une touche
+		while (flag) { // amélioration possible pour quitter le programme: voir si on veut sortir de la boucle à un moment donné, peut etre via une touche et qui aboutirait sur la deconnexion du reader
 			if (nb_tours > max_loops) {
 				reset_la_memoire();
 				nb_tours = 0;
 			}else {
 				nb_tours ++;
 			}
+			Panneau.humainS_detecte=false;
 			//On fait une première lecture
+			System.out.println("début lecture en haut de la boucle");
 			realTimeInventory(temps_lecture,les_antennes);
 			nb_tags_detectes = equipements_presents.size()+humains_presents.size();
 			nb_lectures = 0;
-			while ((nb_tags_detectes < nb_min_tags) & (nb_lectures< max_loops)){
+			System.out.println(" avant boucle on a trouvé "+ nb_tags_detectes+" tags.");
+			while ((nb_tags_detectes < nb_min_tags) & (nb_lectures< 20)){
 				realTimeInventory(temps_lecture,les_antennes);
 				nb_tags_detectes = equipements_presents.size() + humains_presents.size();
 				nb_lectures ++;
+				System.out.println("on a trouvé "+ nb_tags_detectes+" tags.");
+				System.out.println("Pas assez de tags detectés");
 			}
+			for (int i =0; i< humains_presents.size(); i++) {
+				System.out.println("on a trouvé en humain"+ humains_presents.get(i).getId_humain());
+			}
+			for (int i =0; i< equipements_presents.size(); i++) {
+				System.out.println("on a trouvé en equipement"+ equipements_presents.get(i).getId_equipement());
+			}
+			
 			if (isHumanPresent()) {
+				Panneau.humain_detecte= true;
+
 				if(onlyOneHuman()) {
-					Humain personne_sous_le_portique = humains_presents.get(0); // la liste n'est sensé avoir qu'un seul élement, l'humain qui se trouve sous le portique
+					String id_humain = humains_presents.get(0).getId_humain();
+					Humain personne_sous_le_portique =getHumainById(id_humain) ; // la liste n'est sensé avoir qu'un seul élement, l'humain qui se trouve sous le portique
 					String nom_humain = personne_sous_le_portique.getNom();
 					String prenom_humain = personne_sous_le_portique.getPrenom();
 					SetEquipement profession = personne_sous_le_portique.getProfession();
 					int nb_equipements_dans_le_set = profession.getLes_equipements_du_set().size();
 					System.out.println("Bonjour "+prenom_humain +" "+ nom_humain+", votre profession est : "+profession.getNom_du_set()+".");
+					Panneau.nom = nom_humain;
+					Panneau.prenom = prenom_humain;
+					Panneau.profession = profession.getNom_du_set();
 
 					boolean equipement_manquant = is_protection_missing(profession);
 
 					nb_relecture_manquant = 0;
 
-					while (equipement_manquant &&  nb_relecture_manquant<max_loops){
+					while (equipement_manquant &&  nb_relecture_manquant<20){
+						Panneau.equipements_manquants.clear();// on réinitialise à chaque boucle la liste des équipements manquants
 						nb_relecture_manquant++;
-						realTimeInventory(2,les_antennes);
+						realTimeInventory(temps_lecture,les_antennes);
 						equipement_manquant= is_protection_missing(profession);
 						System.out.println("il vous manque : ");
 						for (int i=0; i<nb_equipements_dans_le_set; i++){
 							if (!is_protection_present(profession.getLes_equipements_du_set().get(i))){
 								System.out.println("- "+profession.getLes_equipements_du_set().get(i).getNom());
+								Panneau.equipements_manquants.add(profession.getLes_equipements_du_set().get(i));
 							}
 						}
+						Panneau.equipement_is_missing = true;
+						fen.getContentPane().repaint();
+						dormir(1);
+
+
 					}
 
 					if (equipement_manquant){
 						System.out.println("Désolé, nous n'avons pas réussi à trouver tous vos équipements, pour rappel il vous manque: ");
+						Panneau.equipement_introuvable = true;
+						Panneau.equipements_manquants.clear();
 						for (int i=0; i<nb_equipements_dans_le_set; i++){
 							if (!is_protection_present(profession.getLes_equipements_du_set().get(i))){
 								System.out.println("- "+profession.getLes_equipements_du_set().get(i).getNom());
+								Panneau.equipements_manquants.add(profession.getLes_equipements_du_set().get(i));
 							}
 						}
+						fen.getContentPane().repaint();
 						dormir(3);// on laisse le temps à l'humain de partir
 						reset_la_memoire();
 						nb_tours = 0;
+						Panneau.humain_detecte= false;
 
 					}else{
+						Panneau.equipement_is_missing = false;
+						fen.getContentPane().repaint();
 						System.out.println("Bravo vous avez tous vos équipements c'est génial.");
-						dormir(3);
+						dormir(6);
 						reset_la_memoire();
 						nb_tours = 0;
+						Panneau.humain_detecte= false;
+						fen.getContentPane().repaint();
 					}
 
-
-
 				}else{
+					Panneau.humainS_detecte=true;
+					fen.getContentPane().repaint();
 					System.out.println("Il y a trop d'humains ici, il faut que quelquun recule");
 					dormir(2);// on laisse le temps à l'humain en trop de reculer
 					reset_la_memoire();
@@ -368,12 +430,14 @@ public class MainSinger {
 				}
 			}else{
 				System.out.println("Aucun humain de detecté");
+				Panneau.humain_detecte= false;
+				fen.getContentPane().repaint();
 			}
 			
 			
 		}
 			
-		mConnector.disConnect();
+		mConnector.disConnect(); // n'est jamais appelé car on ne sort jamais de la boucle infinie.
 
 		System.out.println("fin!");
 	}
