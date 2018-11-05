@@ -108,10 +108,11 @@ public class MainSinger {
 
 		// La fonction de lecture est à revoir. En effet une fois que l'ordre est lancé, la lecture ne s'arrete que quand le reader dit avoir termin�, pas au bout des X secondes.
 		//Il n'est peut etre pas nécessaire de setWork les antennes à chaque fois.
-		for (byte antenne : antennes) {
+		/*for (byte antenne : antennes) {
 			setWorkAntenna(antenne);
-		}
-		((RFIDReaderHelper) mReaderHelper).realTimeInventory((byte) 0x01, (byte) 0xff);
+		}*/
+		//((RFIDReaderHelper) mReaderHelper).realTimeInventory((byte) 0xff, (byte) 0xff);
+		((RFIDReaderHelper) mReaderHelper).fastSwitchAntInventory((byte) 0xff,(byte) 0x00, (byte) 0x01, (byte) 0x01, (byte) 0x01,(byte) 0x02, (byte) 0x00, (byte) 0x03, (byte) 0x00,(byte) 0x00, (byte) 0x10);
 		try {
 			TimeUnit.MILLISECONDS.sleep(millisecondes);
 		} catch (InterruptedException e) {
@@ -287,6 +288,7 @@ public class MainSinger {
 		//déploiement de la fenetre graphique
 		Fenetre fen = new Fenetre();
 		Panneau.equipement_is_missing = false;
+		Panneau.intialisation=true;
 		fen.getContentPane().repaint();
 
 
@@ -315,13 +317,13 @@ public class MainSinger {
 			mConnector.disConnect();
 		} 
 		//initialisation des paramètres
-		int max_loops = 5;
+		int max_loops = 10;
 		int over_time = 3;
 		int nb_tours = 0;
 		int nb_relecture_manquant= 0;
 		int nb_lectures = 0;
 		int nb_min_tags = 2;
-		int temps_lecture = 1500;
+		int temps_lecture = 1000;
 		int nb_tags_detectes = 0;
 		byte[] les_antennes = new byte[] {0x00,0x01};
 		
@@ -336,10 +338,16 @@ public class MainSinger {
 			}
 			Panneau.humainS_detecte=false;
 			//On fait une première lecture
+			Panneau.intialisation=false;
 			System.out.println("début lecture en haut de la boucle");
 			realTimeInventory(temps_lecture,les_antennes);
+			fen.getContentPane().repaint();
 			nb_tags_detectes = equipements_presents.size()+humains_presents.size();
-			nb_lectures = 0;
+			// Ce while servait à s'assurer qu'un certain nombre de tags soient présent avant de faire un traitement. Une sorte de déclencheur lorsqu'une personne s'approche
+			// Au final nous nous sommes rendus compte que le code faisait la boucle entière suffisament vite pour ne pas avoir à passer par cette étape.
+			
+			//
+			/*nb_lectures = 0;
 			System.out.println(" avant boucle on a trouvé "+ nb_tags_detectes+" tags.");
 			while ((nb_tags_detectes < nb_min_tags) & (nb_lectures< 20)){
 				realTimeInventory(temps_lecture,les_antennes);
@@ -347,7 +355,7 @@ public class MainSinger {
 				nb_lectures ++;
 				System.out.println("on a trouvé "+ nb_tags_detectes+" tags.");
 				System.out.println("Pas assez de tags detectés");
-			}
+			}*/
 			for (int i =0; i< humains_presents.size(); i++) {
 				System.out.println("on a trouvé en humain"+ humains_presents.get(i).getId_humain());
 			}
@@ -359,6 +367,7 @@ public class MainSinger {
 				Panneau.humain_detecte= true;
 
 				if(onlyOneHuman()) {
+
 					String id_humain = humains_presents.get(0).getId_humain();
 					Humain personne_sous_le_portique =getHumainById(id_humain) ; // la liste n'est sensé avoir qu'un seul élement, l'humain qui se trouve sous le portique
 					String nom_humain = personne_sous_le_portique.getNom();
@@ -366,15 +375,18 @@ public class MainSinger {
 					SetEquipement profession = personne_sous_le_portique.getProfession();
 					int nb_equipements_dans_le_set = profession.getLes_equipements_du_set().size();
 					System.out.println("Bonjour "+prenom_humain +" "+ nom_humain+", votre profession est : "+profession.getNom_du_set()+".");
+					Panneau.recherche_d_equipements = true;
 					Panneau.nom = nom_humain;
 					Panneau.prenom = prenom_humain;
 					Panneau.profession = profession.getNom_du_set();
+					fen.getContentPane().repaint();
 
 					boolean equipement_manquant = is_protection_missing(profession);
 
 					nb_relecture_manquant = 0;
+					Panneau.recherche_d_equipements = false;
 
-					while (equipement_manquant &&  nb_relecture_manquant<20){
+					while (equipement_manquant &&  nb_relecture_manquant<max_loops){
 						Panneau.equipements_manquants.clear();// on réinitialise à chaque boucle la liste des équipements manquants
 						nb_relecture_manquant++;
 						realTimeInventory(temps_lecture,les_antennes);
@@ -408,15 +420,20 @@ public class MainSinger {
 						reset_la_memoire();
 						nb_tours = 0;
 						Panneau.humain_detecte= false;
+						Panneau.equipement_introuvable=false;
 
 					}else{
 						Panneau.equipement_is_missing = false;
+						Panneau.equipement_introuvable =false;
+						Panneau.tout_est_present = true;
 						fen.getContentPane().repaint();
 						System.out.println("Bravo vous avez tous vos équipements c'est génial.");
 						dormir(6);
 						reset_la_memoire();
 						nb_tours = 0;
 						Panneau.humain_detecte= false;
+						Panneau.equipement_is_missing=true;
+						Panneau.tout_est_present = false;
 						fen.getContentPane().repaint();
 					}
 
